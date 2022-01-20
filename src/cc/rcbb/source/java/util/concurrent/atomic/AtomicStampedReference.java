@@ -50,7 +50,9 @@ package java.util.concurrent.atomic;
 public class AtomicStampedReference<V> {
 
     private static class Pair<T> {
+        // 维护对象引用
         final T reference;
+        // 用于标志版本
         final int stamp;
         private Pair(T reference, int stamp) {
             this.reference = reference;
@@ -142,16 +144,30 @@ public class AtomicStampedReference<V> {
      * @param newStamp the new value for the stamp
      * @return {@code true} if successful
      */
+    /**
+     *
+     * @param expectedReference 更新之前的原始值
+     * @param newReference  将要更新的新值
+     * @param expectedStamp 期待更新的标志版本
+     * @param newStamp     将要更新的标志版本
+     * @return
+     */
     public boolean compareAndSet(V   expectedReference,
                                  V   newReference,
                                  int expectedStamp,
                                  int newStamp) {
+        // 获取当前的（元素值，版本号）
         Pair<V> current = pair;
         return
+                // 引用没变
             expectedReference == current.reference &&
+                    // 版本号没变
             expectedStamp == current.stamp &&
+                    // 新引用等于旧引用
             ((newReference == current.reference &&
+                    // 新版本号等于旧版本号
               newStamp == current.stamp) ||
+                    // 构造新的Pair对象并进行CAS更新
              casPair(current, Pair.of(newReference, newStamp)));
     }
 

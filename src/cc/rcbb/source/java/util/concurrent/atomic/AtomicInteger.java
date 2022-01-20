@@ -60,6 +60,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
 
     static {
         try {
+            // 获取value字段相对于当前对象的“起始地址”的偏移量
             valueOffset = unsafe.objectFieldOffset
                 (AtomicInteger.class.getDeclaredField("value"));
         } catch (Exception ex) { throw new Error(ex); }
@@ -174,6 +175,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @return the previous value
      */
     public final int getAndAdd(int delta) {
+        // 三个参数：1.当前实例；2：value实例变量中的偏移量；3：当前value要加上的数；
         return unsafe.getAndAddInt(this, valueOffset, delta);
     }
 
@@ -183,6 +185,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
      * @return the updated value
      */
     public final int incrementAndGet() {
+        // 递增加1
         return unsafe.getAndAddInt(this, valueOffset, 1) + 1;
     }
 

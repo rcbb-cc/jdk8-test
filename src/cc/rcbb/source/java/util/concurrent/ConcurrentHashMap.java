@@ -792,6 +792,9 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
      * creation, or 0 for default. After initialization, holds the
      * next element count value upon which to resize the table.
      */
+    // 小于0时，表示正在初始化或正在调整大小；
+    // -1：表示初始化；0：默认值；
+    // 大于0时，表示下次扩容的计数值；
     private transient volatile int sizeCtl;
 
     /**
@@ -836,6 +839,8 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     public ConcurrentHashMap(int initialCapacity) {
         if (initialCapacity < 0)
             throw new IllegalArgumentException();
+        // 1.如果初始化容量大于或等于最大容量的一半，则直接使用最大容量
+        // 2.将 (1.5 * 传入的初始化容量 + 1) 向上取最接近 2 的 n 次方。
         int cap = ((initialCapacity >= (MAXIMUM_CAPACITY >>> 1)) ?
                    MAXIMUM_CAPACITY :
                    tableSizeFor(initialCapacity + (initialCapacity >>> 1) + 1));
@@ -1009,36 +1014,52 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     /** Implementation for put and putIfAbsent */
     final V putVal(K key, V value, boolean onlyIfAbsent) {
         if (key == null || value == null) throw new NullPointerException();
+        // 获取hash值
         int hash = spread(key.hashCode());
+        // 用于记录
         int binCount = 0;
         for (Node<K,V>[] tab = table;;) {
             Node<K,V> f; int n, i, fh;
             if (tab == null || (n = tab.length) == 0)
+                // 如果数组为空，进行初始化
                 tab = initTable();
+            // 条件：根据hash计算数组下标，得到第一个结点f，如果f结点为null
             else if ((f = tabAt(tab, i = (n - 1) & hash)) == null) {
+                // 使用CAS操作将新值放入
                 if (casTabAt(tab, i, null,
                              new Node<K,V>(hash, key, value, null)))
                     break;                   // no lock when adding to empty bin
             }
+            // 条件：f结点的hash值为MOVED，表示正在扩容
             else if ((fh = f.hash) == MOVED)
+                // 帮助扩容
                 tab = helpTransfer(tab, f);
+            // 条件：f是该位置的头结点，而且不为空
             else {
                 V oldVal = null;
+                // 获取数组该位置的头结点的监视器锁
                 synchronized (f) {
+                    // 条件：double check，重新判断一次
                     if (tabAt(tab, i) == f) {
+                        // 条件：头结点的hash值大于或等于0，代表是链表
                         if (fh >= 0) {
+                            // 用于累加，记录链表的长度
                             binCount = 1;
                             for (Node<K,V> e = f;; ++binCount) {
                                 K ek;
+                                // 条件：发现相同的hash值，并且key也相同
                                 if (e.hash == hash &&
                                     ((ek = e.key) == key ||
                                      (ek != null && key.equals(ek)))) {
+                                    // 存储下原来的值
                                     oldVal = e.val;
+                                    // 条件：判断是否覆盖
                                     if (!onlyIfAbsent)
                                         e.val = value;
                                     break;
                                 }
                                 Node<K,V> pred = e;
+                                // 条件：到了链表末端，将新值放到链表最后面
                                 if ((e = e.next) == null) {
                                     pred.next = new Node<K,V>(hash, key,
                                                               value, null);
@@ -1046,9 +1067,11 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                                 }
                             }
                         }
+                        // 条件：如果是红黑树
                         else if (f instanceof TreeBin) {
                             Node<K,V> p;
                             binCount = 2;
+                            // 调用红黑树的逻辑插入新结点
                             if ((p = ((TreeBin<K,V>)f).putTreeVal(hash, key,
                                                            value)) != null) {
                                 oldVal = p.val;
@@ -1059,7 +1082,10 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
                     }
                 }
                 if (binCount != 0) {
+                    // 条件：判断链表长度是否 >= 8
                     if (binCount >= TREEIFY_THRESHOLD)
+                        // 转换为红黑树
+                        // （但是在方法中会判断，如果当前数组的长度小于64，则会选择数组扩容，而不转红黑树）
                         treeifyBin(tab, i);
                     if (oldVal != null)
                         return oldVal;
@@ -2223,15 +2249,21 @@ public class ConcurrentHashMap<K,V> extends AbstractMap<K,V>
     private final Node<K,V>[] initTable() {
         Node<K,V>[] tab; int sc;
         while ((tab = table) == null || tab.length == 0) {
+            // 条件：sizeCtl小于0
             if ((sc = sizeCtl) < 0)
+                // 已经被其他线程执行了
                 Thread.yield(); // lost initialization race; just spin
+            // 条件：CAS 将sizeCtl设置为-1，代表抢到了锁
             else if (U.compareAndSwapInt(this, SIZECTL, sc, -1)) {
                 try {
                     if ((tab = table) == null || tab.length == 0) {
+                        // sc如果大于0，则直接使用，否则使用默认容量
                         int n = (sc > 0) ? sc : DEFAULT_CAPACITY;
                         @SuppressWarnings("unchecked")
+                        // 初始化数组
                         Node<K,V>[] nt = (Node<K,V>[])new Node<?,?>[n];
                         table = tab = nt;
+                        // n * 0.75
                         sc = n - (n >>> 2);
                     }
                 } finally {

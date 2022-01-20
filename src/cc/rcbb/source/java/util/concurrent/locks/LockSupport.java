@@ -118,10 +118,12 @@ import sun.misc.Unsafe;
  * }}</pre>
  */
 public class LockSupport {
+    // 私有构造函数，无法被实例化
     private LockSupport() {} // Cannot be instantiated.
 
     private static void setBlocker(Thread t, Object arg) {
         // Even though volatile, hotspot doesn't need a write barrier here.
+        // 设置线程t的parkBlocker字段的值为arg
         UNSAFE.putObject(t, parkBlockerOffset, arg);
     }
 
@@ -138,6 +140,7 @@ public class LockSupport {
      */
     public static void unpark(Thread thread) {
         if (thread != null)
+            // 释放该线程许可
             UNSAFE.unpark(thread);
     }
 
@@ -170,9 +173,13 @@ public class LockSupport {
      * @since 1.6
      */
     public static void park(Object blocker) {
+        // 获取当前线程
         Thread t = Thread.currentThread();
+        // 设置Blocker
         setBlocker(t, blocker);
+        // 获取许可
         UNSAFE.park(false, 0L);
+        // 重新可运行后再设置Blocker
         setBlocker(t, null);
     }
 
@@ -208,11 +215,16 @@ public class LockSupport {
      * @param nanos the maximum number of nanoseconds to wait
      * @since 1.6
      */
+    // 表示在许可可用前禁用当前线程，并最多等待指定的等待时间。nanos是相对时间。
     public static void parkNanos(Object blocker, long nanos) {
+        // 时间大于0
         if (nanos > 0) {
             Thread t = Thread.currentThread();
+            // 设置Blocker
             setBlocker(t, blocker);
+            // 获取许可，并设置了时间
             UNSAFE.park(false, nanos);
+            // 重新可运行后再设置Blocker
             setBlocker(t, null);
         }
     }
@@ -250,6 +262,7 @@ public class LockSupport {
      *        to wait until
      * @since 1.6
      */
+    // 再指定的时限前禁用当前线程，除非许可可用。deadline是绝对时间。
     public static void parkUntil(Object blocker, long deadline) {
         Thread t = Thread.currentThread();
         setBlocker(t, blocker);
@@ -301,6 +314,7 @@ public class LockSupport {
      * for example, the interrupt status of the thread upon return.
      */
     public static void park() {
+        // 获取许可，设置时间为无限长，直到可以获取许可
         UNSAFE.park(false, 0L);
     }
 
@@ -398,14 +412,19 @@ public class LockSupport {
     private static final long SECONDARY;
     static {
         try {
+            // 获取Unsafe实例
             UNSAFE = sun.misc.Unsafe.getUnsafe();
             Class<?> tk = Thread.class;
+            // 获取Thread的parkBlocker字段的内存偏移地址
             parkBlockerOffset = UNSAFE.objectFieldOffset
                 (tk.getDeclaredField("parkBlocker"));
+            // 获取threadLocalRandomSeed字段的内存便宜地址
             SEED = UNSAFE.objectFieldOffset
                 (tk.getDeclaredField("threadLocalRandomSeed"));
+            // 获取threadLocalRandomProbe字段的内存便宜地址
             PROBE = UNSAFE.objectFieldOffset
                 (tk.getDeclaredField("threadLocalRandomProbe"));
+            // 获取threadLocalRandomProbe字段的内存便宜地址
             SECONDARY = UNSAFE.objectFieldOffset
                 (tk.getDeclaredField("threadLocalRandomSecondarySeed"));
         } catch (Exception ex) { throw new Error(ex); }

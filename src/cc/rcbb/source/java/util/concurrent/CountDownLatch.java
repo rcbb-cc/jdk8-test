@@ -176,10 +176,14 @@ public class CountDownLatch {
         protected boolean tryReleaseShared(int releases) {
             // Decrement count; signal when transition to zero
             for (;;) {
+                // 读取状态
                 int c = getState();
+                // 条件：状态为0，代表没有线程占有
                 if (c == 0)
                     return false;
+                // 下一个状态
                 int nextc = c-1;
+                // 条件：比较并设置成功
                 if (compareAndSetState(c, nextc))
                     return nextc == 0;
             }
@@ -287,6 +291,7 @@ public class CountDownLatch {
      *
      * <p>If the current count equals zero then nothing happens.
      */
+    // 递减锁存器的计数，当计数到达0时，释放所有等待的线程+
     public void countDown() {
         sync.releaseShared(1);
     }
